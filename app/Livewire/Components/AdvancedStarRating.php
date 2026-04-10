@@ -12,7 +12,7 @@ use Livewire\Attributes\Isolate;
 use Livewire\Component;
 
 #[Isolate]
-class StarRating extends Component
+class AdvancedStarRating extends Component
 {
     /**
      * The id the model.
@@ -29,7 +29,7 @@ class StarRating extends Component
     public ?string $modelType;
 
     /**
-     * The rating used to fill the stars.
+     * The rating used to fill the stars (0-10 scale).
      *
      * @var float|null $rating
      */
@@ -68,7 +68,7 @@ class StarRating extends Component
      */
     protected function listenerKey(): string
     {
-        return 'star-rating-updated-' . $this->modelID . '-' . $this->modelType;
+        return 'advanced-star-rating-updated-' . $this->modelID . '-' . $this->modelType;
     }
 
     /**
@@ -76,7 +76,7 @@ class StarRating extends Component
      *
      * @param null|string $modelId
      * @param null|string $modelType
-     * @param null|float  $rating
+     * @param null|float  $rating Internal rating value (0-10)
      * @param string      $starSize
      * @param bool        $disabled
      *
@@ -88,9 +88,9 @@ class StarRating extends Component
         $this->modelType = $modelType;
         $this->rating = $rating ?? MediaRating::MIN_RATING_VALUE;
         $this->starSize = match ($starSize) {
-            'sm' => 'h-4',
-            'md' => 'h-6',
-            default => 'h-8'
+            'sm' => 'h-3',
+            'md' => 'h-5',
+            default => 'h-6'
         };
         $this->disabled = $disabled;
     }
@@ -118,21 +118,20 @@ class StarRating extends Component
                 return;
             }
 
-            // Convert 5-star rating to internal 10-star scale
-            $internalRating = RatingStyle::standardToInternal($this->rating);
-
             // Update authenticated user's rating
             $user->mediaRatings()->withoutGlobalScopes()
                 ->updateOrCreate([
                     'model_id' => $this->modelID,
                     'model_type' => $this->modelType,
                 ], [
-                    'rating' => $internalRating,
-                    'rating_style' => RatingStyle::Standard,
+                    'rating' => $this->rating,
+                    'rating_style' => RatingStyle::Advanced,
                 ]);
         }
 
         $this->dispatch($this->listenerKey(), id: $this->getID(), modelID: $this->modelID, modelType: $this->modelType, rating: $this->rating);
+        // Also dispatch the standard star-rating event for other components
+        $this->dispatch('star-rating-updated-' . $this->modelID . '-' . $this->modelType, id: $this->getID(), modelID: $this->modelID, modelType: $this->modelType, rating: $this->rating);
     }
 
     /**
@@ -163,6 +162,6 @@ class StarRating extends Component
      */
     public function render(): Application|Factory|View
     {
-        return view('livewire.components.star-rating');
+        return view('livewire.components.advanced-star-rating');
     }
 }

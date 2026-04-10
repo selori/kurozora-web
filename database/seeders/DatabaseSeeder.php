@@ -20,6 +20,7 @@ class DatabaseSeeder extends Seeder
             StaffRoleSeeder::class,
             CastRoleSeeder::class,
             TvRatingSeeder::class,
+            RatingCategorySeeder::class,
             MediaTypeSeeder::class,
             RelationSeeder::class,
             SourceSeeder::class,

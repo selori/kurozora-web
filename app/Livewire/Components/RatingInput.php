@@ -6,13 +6,12 @@ use App\Enums\RatingStyle;
 use App\Models\MediaRating;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Livewire\Attributes\Isolate;
 use Livewire\Component;
 
 #[Isolate]
-class StarRating extends Component
+class RatingInput extends Component
 {
     /**
      * The id the model.
@@ -29,7 +28,7 @@ class StarRating extends Component
     public ?string $modelType;
 
     /**
-     * The rating used to fill the stars.
+     * The rating used to fill the stars (internal 0-10 scale).
      *
      * @var float|null $rating
      */
@@ -50,13 +49,20 @@ class StarRating extends Component
     public bool $disabled;
 
     /**
+     * Whether to show the "elaborate" prompt for low standard ratings.
+     *
+     * @var bool $showElaboratePrompt
+     */
+    public bool $showElaboratePrompt = false;
+
+    /**
      * The component's listeners.
      *
      * @return array
      */
     protected function getListeners(): array
     {
-        return $this->disabled ? [] : [
+        return [
             $this->listenerKey() => 'handleRatingUpdate',
         ];
     }
@@ -76,7 +82,7 @@ class StarRating extends Component
      *
      * @param null|string $modelId
      * @param null|string $modelType
-     * @param null|float  $rating
+     * @param null|float  $rating Internal rating value (0-10)
      * @param string      $starSize
      * @param bool        $disabled
      *
@@ -87,52 +93,24 @@ class StarRating extends Component
         $this->modelID = $modelId;
         $this->modelType = $modelType;
         $this->rating = $rating ?? MediaRating::MIN_RATING_VALUE;
-        $this->starSize = match ($starSize) {
-            'sm' => 'h-4',
-            'md' => 'h-6',
-            default => 'h-8'
-        };
+        $this->starSize = $starSize;
         $this->disabled = $disabled;
     }
 
     /**
-     * Updates the authenticated user's rating of the model.
+     * Get the user's preferred rating style.
      *
-     * @return RedirectResponse|void
+     * @return RatingStyle
      */
-    public function rate()
+    public function getUserRatingStyleProperty(): RatingStyle
     {
         $user = auth()->user();
 
-        if (empty($user)) {
-            return to_route('sign-in');
+        if (empty($user) || $user->rating_style === null) {
+            return RatingStyle::fromValue(RatingStyle::Standard);
         }
 
-        if ($this->rating == -1) {
-            $user->mediaRatings()->where([
-                ['model_id', '=', $this->modelID],
-                ['model_type', '=', $this->modelType],
-            ])->forceDelete();
-        } else {
-            if ($this->rating < MediaRating::MIN_RATING_VALUE || $this->rating > MediaRating::MAX_RATING_VALUE) {
-                return;
-            }
-
-            // Convert 5-star rating to internal 10-star scale
-            $internalRating = RatingStyle::standardToInternal($this->rating);
-
-            // Update authenticated user's rating
-            $user->mediaRatings()->withoutGlobalScopes()
-                ->updateOrCreate([
-                    'model_id' => $this->modelID,
-                    'model_type' => $this->modelType,
-                ], [
-                    'rating' => $internalRating,
-                    'rating_style' => RatingStyle::Standard,
-                ]);
-        }
-
-        $this->dispatch($this->listenerKey(), id: $this->getID(), modelID: $this->modelID, modelType: $this->modelType, rating: $this->rating);
+        return $user->rating_style;
     }
 
     /**
@@ -147,13 +125,27 @@ class StarRating extends Component
      */
     public function handleRatingUpdate($id, $modelID, $modelType, $rating): void
     {
-        if (
-            $this->getID() != $id &&
-            $modelID == $this->modelID &&
-            $modelType == $this->modelType
-        ) {
+        if ($modelID == $this->modelID && $modelType == $this->modelType) {
             $this->rating = $rating;
+
+            // Check if we should show the elaborate prompt
+            // For standard rating, if rating is 8 or below (4 stars or less), offer to elaborate
+            if ($this->userRatingStyle->value === RatingStyle::Standard && $rating !== null && $rating <= 8 && $rating > 0) {
+                $this->showElaboratePrompt = true;
+            } else {
+                $this->showElaboratePrompt = false;
+            }
         }
+    }
+
+    /**
+     * Dismiss the elaborate prompt.
+     *
+     * @return void
+     */
+    public function dismissElaboratePrompt(): void
+    {
+        $this->showElaboratePrompt = false;
     }
 
     /**
@@ -163,6 +155,6 @@ class StarRating extends Component
      */
     public function render(): Application|Factory|View
     {
-        return view('livewire.components.star-rating');
+        return view('livewire.components.rating-input');
     }
 }

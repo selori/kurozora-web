@@ -12,7 +12,7 @@ use Livewire\Attributes\Isolate;
 use Livewire\Component;
 
 #[Isolate]
-class StarRating extends Component
+class QuickReactionRating extends Component
 {
     /**
      * The id the model.
@@ -29,18 +29,11 @@ class StarRating extends Component
     public ?string $modelType;
 
     /**
-     * The rating used to fill the stars.
+     * The quick reaction value (-1, 0, 1, or null for not rated).
      *
-     * @var float|null $rating
+     * @var int|null $reaction
      */
-    public ?float $rating;
-
-    /**
-     * The size of the stars.
-     *
-     * @var string $starSize
-     */
-    public string $starSize;
+    public ?int $reaction;
 
     /**
      * Whether interaction with the rating is disabled.
@@ -68,7 +61,7 @@ class StarRating extends Component
      */
     protected function listenerKey(): string
     {
-        return 'star-rating-updated-' . $this->modelID . '-' . $this->modelType;
+        return 'quick-reaction-updated-' . $this->modelID . '-' . $this->modelType;
     }
 
     /**
@@ -76,31 +69,27 @@ class StarRating extends Component
      *
      * @param null|string $modelId
      * @param null|string $modelType
-     * @param null|float  $rating
-     * @param string      $starSize
+     * @param null|float  $rating Internal rating value (0-10)
      * @param bool        $disabled
      *
      * @return void
      */
-    function mount(?string $modelId = null, ?string $modelType = null, ?float $rating = null, string $starSize = 'md', bool $disabled = false): void
+    function mount(?string $modelId = null, ?string $modelType = null, ?float $rating = null, bool $disabled = false): void
     {
         $this->modelID = $modelId;
         $this->modelType = $modelType;
-        $this->rating = $rating ?? MediaRating::MIN_RATING_VALUE;
-        $this->starSize = match ($starSize) {
-            'sm' => 'h-4',
-            'md' => 'h-6',
-            default => 'h-8'
-        };
+        $this->reaction = $rating !== null ? RatingStyle::ratingToQuickReaction($rating) : null;
         $this->disabled = $disabled;
     }
 
     /**
      * Updates the authenticated user's rating of the model.
      *
+     * @param int $value The reaction value (-1, 0, 1, or -2 to remove)
+     *
      * @return RedirectResponse|void
      */
-    public function rate()
+    public function rate(int $value)
     {
         $user = auth()->user();
 
@@ -108,18 +97,19 @@ class StarRating extends Component
             return to_route('sign-in');
         }
 
-        if ($this->rating == -1) {
+        if ($value == -2) {
+            // Remove rating
             $user->mediaRatings()->where([
                 ['model_id', '=', $this->modelID],
                 ['model_type', '=', $this->modelType],
             ])->forceDelete();
+            $this->reaction = null;
         } else {
-            if ($this->rating < MediaRating::MIN_RATING_VALUE || $this->rating > MediaRating::MAX_RATING_VALUE) {
+            if (!in_array($value, [-1, 0, 1])) {
                 return;
             }
 
-            // Convert 5-star rating to internal 10-star scale
-            $internalRating = RatingStyle::standardToInternal($this->rating);
+            $internalRating = RatingStyle::quickReactionToRating($value);
 
             // Update authenticated user's rating
             $user->mediaRatings()->withoutGlobalScopes()
@@ -128,11 +118,15 @@ class StarRating extends Component
                     'model_type' => $this->modelType,
                 ], [
                     'rating' => $internalRating,
-                    'rating_style' => RatingStyle::Standard,
+                    'rating_style' => RatingStyle::QuickReaction,
                 ]);
+
+            $this->reaction = $value;
         }
 
-        $this->dispatch($this->listenerKey(), id: $this->getID(), modelID: $this->modelID, modelType: $this->modelType, rating: $this->rating);
+        $this->dispatch($this->listenerKey(), id: $this->getID(), modelID: $this->modelID, modelType: $this->modelType, reaction: $this->reaction);
+        // Also dispatch the standard star-rating event for other components
+        $this->dispatch('star-rating-updated-' . $this->modelID . '-' . $this->modelType, id: $this->getID(), modelID: $this->modelID, modelType: $this->modelType, rating: $this->reaction !== null ? RatingStyle::quickReactionToRating($this->reaction) : null);
     }
 
     /**
@@ -141,18 +135,18 @@ class StarRating extends Component
      * @param $id
      * @param $modelID
      * @param $modelType
-     * @param $rating
+     * @param $reaction
      *
      * @return void
      */
-    public function handleRatingUpdate($id, $modelID, $modelType, $rating): void
+    public function handleRatingUpdate($id, $modelID, $modelType, $reaction): void
     {
         if (
             $this->getID() != $id &&
             $modelID == $this->modelID &&
             $modelType == $this->modelType
         ) {
-            $this->rating = $rating;
+            $this->reaction = $reaction;
         }
     }
 
@@ -163,6 +157,6 @@ class StarRating extends Component
      */
     public function render(): Application|Factory|View
     {
-        return view('livewire.components.star-rating');
+        return view('livewire.components.quick-reaction-rating');
     }
 }

@@ -304,7 +304,7 @@
                     <div class="flex justify-between items-center">
                         <p class="">{{ __('Click to Rate:') }}</p>
 
-                        <livewire:components.star-rating :model-id="$game->id" :model-type="$game->getMorphClass()" :rating="$userRating->first()?->rating" :star-size="'md'" />
+                        <livewire:components.rating-input :model-id="$game->id" :model-type="$game->getMorphClass()" :rating="$userRating->first()?->rating" :star-size="'md'" />
                     </div>
 
                     <div class="flex justify-between">

@@ -129,6 +129,7 @@ class User extends Authenticatable implements HasMedia, MustVerifyEmail, Reacter
             'is_subscribed' => 'bool',
             'is_verified' => 'bool',
             'can_change_username' => 'bool',
+            'rating_style' => \App\Enums\RatingStyle::class,
         ];
     }
 
