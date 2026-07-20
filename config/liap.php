@@ -114,18 +114,43 @@ return [
          | These event listeners are triggered when a new notification is received from Google Play
          | @see @see https://imdhemy.com/laravel-iap-docs/docs/server-notifications/event-list#google-play-events
          */
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionPurchased::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionRenewed::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionInGracePeriod::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionExpired::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionCanceled::class => [],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionPurchased::class => [
+            \App\Listeners\PlayStore\Subscribed::class,
+        ],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionRenewed::class => [
+            \App\Listeners\PlayStore\DidRenew::class,
+            \App\Listeners\PlayStore\RenewalExtended::class,
+        ],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionInGracePeriod::class => [
+            \App\Listeners\PlayStore\DidFailToRenew::class,
+        ],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionOnHold::class => [
+            \App\Listeners\PlayStore\GracePeriodExpired::class,
+        ],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionExpired::class => [
+            \App\Listeners\PlayStore\Expired::class,
+        ],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionCanceled::class => [
+            \App\Listeners\PlayStore\DidChangeRenewalStatus::class,
+        ],
         \Imdhemy\Purchases\Events\GooglePlay\SubscriptionPaused::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionRestarted::class => [],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionRestarted::class => [
+            \App\Listeners\PlayStore\DidChangeRenewalStatus::class,
+            \App\Listeners\PlayStore\Subscribed::class,
+        ],
         \Imdhemy\Purchases\Events\GooglePlay\SubscriptionDeferred::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionRevoked::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionOnHold::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionRecovered::class => [],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionRevoked::class => [
+            \App\Listeners\PlayStore\Refund::class,
+            \App\Listeners\PlayStore\Revoke::class,
+        ],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionRecovered::class => [
+            \App\Listeners\PlayStore\DidChangeRenewalStatus::class,
+            \App\Listeners\PlayStore\Subscribed::class,
+        ],
         \Imdhemy\Purchases\Events\GooglePlay\SubscriptionPauseScheduleChanged::class => [],
-        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionPriceChangeConfirmed::class => [],
+        \Imdhemy\Purchases\Events\GooglePlay\SubscriptionPriceChangeConfirmed::class => [
+            \App\Listeners\PlayStore\PriceIncrease::class,
+            \App\Listeners\PlayStore\DidChangeRenewalPref::class,
+        ],
     ],
 ];

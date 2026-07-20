@@ -1,25 +1,33 @@
 <?php
 
 use App\Http\Controllers\API\v1\StoreController;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('/store')
+Route::prefix('store')
     ->name('.store')
     ->group(function () {
-        Route::prefix('/subscriptions')
+        Route::prefix('subscriptions')
             ->name('.subscriptions')
             ->group(function () {
-                Route::post('/apple', function(\Illuminate\Http\Request $request) {
+                Route::post('apple', function(\Illuminate\Http\Request $request) {
                     Http::post(route('liap.serverNotifications', ['provider' => 'app-store']), $request->all());
                 })
                     ->name('.apple');
+
+                Route::post('google-play', [\App\Http\Controllers\API\v1\GooglePlayNotificationController::class, 'handle'])
+                    ->name('.google-play');
             });
 
-        Route::post('/restore-order', [StoreController::class, 'restoreOrder'])
+        Route::post('restore-order', [StoreController::class, 'restoreOrder'])
             ->middleware('auth.kurozora')
             ->name('.restore-order');
 
-        Route::post('/verify', [StoreController::class, 'verifyReceipt'])
+        Route::post('verify', [StoreController::class, 'verifyReceipt'])
             ->middleware('auth.kurozora')
             ->name('.verify');
+
+        Route::post('purchases/google-play/verify', [\App\Http\Controllers\API\v1\GooglePlayPurchaseController::class, 'verify'])
+            ->middleware('auth.kurozora')
+            ->name('.google-play.verify');
     });

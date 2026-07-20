@@ -72,6 +72,16 @@ class AppServiceProvider extends ServiceProvider
         // Register events
         Event::listen(SocialiteWasCalled::class, AppleExtendSocialite::class.'@handle');
 
+        // Play Store one-time product events
+        Event::listen(
+            \App\Events\PlayStore\OneTimeProductPurchased::class,
+            \App\Listeners\PlayStore\OneTimeProductPurchased::class
+        );
+        Event::listen(
+            \App\Events\PlayStore\OneTimeProductCanceled::class,
+            \App\Listeners\PlayStore\OneTimeProductCanceled::class
+        );
+
         /// Register gates
         Gate::define('viewPulse', function (User $user) {
             return $user->hasRole('superAdmin');
