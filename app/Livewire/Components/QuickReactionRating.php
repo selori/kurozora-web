@@ -6,6 +6,7 @@ use App\Enums\EmojiScore;
 use App\Support\UserLibraryTouch;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\Factory;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
 use Livewire\Attributes\Isolate;
 use Livewire\Component;
@@ -42,25 +43,18 @@ class QuickReactionRating extends Component
     public bool $disabled = false;
 
     /**
+     * Whether removing rating is allowed.
+     *
+     * @var bool $allowsRemove
+     */
+    public bool $allowsRemove = false;
+
+    /**
      * Whether the removal confirmation is shown.
      *
      * @var bool $confirmingRemoval
      */
     public bool $confirmingRemoval = false;
-
-    /**
-     * The reason the model may not be rated.
-     *
-     * @var string|null $ratingRestriction
-     */
-    public ?string $ratingRestriction = null;
-
-    /**
-     * Whether the rating restriction is shown.
-     *
-     * @var bool $showingRatingRestriction
-     */
-    public bool $showingRatingRestriction = false;
 
     /**
      * The component's listeners.
@@ -91,15 +85,17 @@ class QuickReactionRating extends Component
      * @param null|string $modelType
      * @param null|float  $rating
      * @param bool        $disabled
+     * @param bool        $allowsRemove
      *
      * @return void
      */
-    public function mount(?string $modelId = null, ?string $modelType = null, ?float $rating = null, bool $disabled = false): void
+    public function mount(?string $modelId = null, ?string $modelType = null, ?float $rating = null, bool $disabled = false, bool $allowsRemove = false): void
     {
         $this->modelID = $modelId;
         $this->modelType = $modelType;
         $this->emojiScore = EmojiScore::fromRating($rating)?->value;
         $this->disabled = $disabled;
+        $this->allowsRemove = $allowsRemove;
     }
 
     /**
@@ -107,15 +103,14 @@ class QuickReactionRating extends Component
      *
      * @param int $value
      *
-     * @return void
+     * @return RedirectResponse|void
      */
     public function rate(int $value)
     {
         $user = auth()->user();
 
         if (empty($user)) {
-            $this->redirectRoute('sign-in', navigate: true);
-            return;
+            return to_route('sign-in');
         }
 
         $emojiScore = EmojiScore::coerce($value);
@@ -124,14 +119,17 @@ class QuickReactionRating extends Component
             return;
         }
 
-        // Tapping the selected reaction again removes the rating.
         if ($this->emojiScore === $emojiScore->value) {
+            if (!$this->allowsRemove) {
+                return;
+            }
+
             $mediaRating = $user->mediaRatings()->where([
                 ['model_id', '=', $this->modelID],
                 ['model_type', '=', $this->modelType],
             ])->first();
 
-            // Removing the rating also deletes the review, so ask for confirmation first.
+            // Removing the rating also deletes the review.
             if (filled($mediaRating?->description)) {
                 $this->confirmingRemoval = true;
                 return;
@@ -145,16 +143,6 @@ class QuickReactionRating extends Component
             UserLibraryTouch::touch($user->id, $this->modelType, [$this->modelID]);
 
             $this->dispatch($this->listenerKey(), id: $this->getID(), modelID: $this->modelID, modelType: $this->modelType, rating: null);
-            return;
-        }
-
-        $model = $this->modelType::withoutGlobalScopes()
-            ->whereKey($this->modelID)
-            ->first();
-
-        if ($model !== null && ($restriction = $model->ratingRestrictionFor($user)) !== null) {
-            $this->ratingRestriction = $restriction;
-            $this->showingRatingRestriction = true;
             return;
         }
 
@@ -179,15 +167,14 @@ class QuickReactionRating extends Component
     /**
      * Removes the authenticated user's rating of the model.
      *
-     * @return void
+     * @return RedirectResponse|void
      */
     public function removeRating()
     {
         $user = auth()->user();
 
         if (empty($user)) {
-            $this->redirectRoute('sign-in', navigate: true);
-            return;
+            return to_route('sign-in');
         }
 
         // Delete through the model so observers fire.
